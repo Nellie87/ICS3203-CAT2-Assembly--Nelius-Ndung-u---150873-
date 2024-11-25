@@ -1,158 +1,123 @@
+; Array Manipulation with Looping and Reversal
+; Accepts an array of integers (e.g., five values) as input from the user, reverses the array and outputs it.
+
 section .data
-    prompt db "Enter up to 5 integers (space-separated): ", 0
-    output_msg db "Reversed Array: ", 0
-    space db " ", 0
-    newline db 10, 0           ; Newline character for formatting
+    prompt db "Enter five single digits separated by spaces (e.g., 1 2 3 4 5): ", 0
+    prompt_len equ $ - prompt
+    newline db 10                                   ; Newline character
+    invalid_input_msg db "Invalid input! Please try again.", 0
+    invalid_input_len equ $ - invalid_input_msg
 
 section .bss
-    array resd 5               ; Reserve space for up to 5 integers
-    input_buffer resb 64       ; Input buffer to hold user input
+    input resb 16      ; Reserve space for the user input line
+    array resb 5       ; Reserve space for the digits (5 bytes)
 
 section .text
     global _start
 
 _start:
     ; Prompt the user for input
-    mov eax, 4                ; syscall: sys_write
-    mov ebx, 1                ; stdout
-    mov ecx, prompt           ; Message pointer
-    mov edx, 39               ; Message length
-    int 0x80
+input_loop:
+    mov rax, 1              ; sys_write
+    mov rdi, 1              ; stdout
+    mov rsi, prompt         ; Address of prompt
+    mov rdx, prompt_len     ; Length of prompt
+    syscall
 
     ; Read input from the user
-    mov eax, 3                ; syscall: sys_read
-    mov ebx, 0                ; stdin
-    mov ecx, input_buffer     ; Input buffer pointer
-    mov edx, 64               ; Max buffer size
-    int 0x80
+    mov rax, 0              ; sys_read
+    mov rdi, 0              ; stdin
+    mov rsi, input          ; Address of input buffer
+    mov rdx, 16             ; Maximum length to read
+    syscall
 
-    ; Convert input string to integers
-    lea esi, input_buffer     ; Point to input buffer
-    lea edi, array            ; Point to array in memory
-    xor ecx, ecx              ; Counter for integers parsed
+    ; Parse the input and extract digits
+    xor r12, r12            ; Index for the array
+    mov rdi, input          ; Address of the input buffer
 
 parse_input:
-    mov al, byte [esi]
-    cmp al, ' '               ; Skip spaces
-    je skip_space
-    cmp al, 10                ; Check for newline
-    je end_parse
-    cmp al, 0                 ; End of string
-    je end_parse
+    ; Check if we've processed 5 digits
+    cmp r12, 5
+    je reverse_array
 
-    ; Convert ASCII to integer
-    xor ebx, ebx              ; Reset current number
-parse_digit:
-    mov al, byte [esi]
+    ; Load a character from the input buffer
+    mov al, [rdi]
+    cmp al, 0               ; Check for null terminator (end of string)
+    je invalid_input        ; If reached, input is invalid (not enough digits)
+
+    ; Check if the character is a digit
     cmp al, '0'
-    jl store_number           ; Stop if not a digit
+    jl skip_char            ; Skip non-digit characters
     cmp al, '9'
-    jg store_number
-    sub al, '0'               ; Convert ASCII to numeric value
-    imul ebx, ebx, 10         ; Multiply current number by 10
-    add ebx, eax              ; Add the current digit
-    inc esi                   ; Move to the next character
-    jmp parse_digit
+    jg skip_char            ; Skip non-digit characters
 
-store_number:
-    cmp ecx, 5                ; Check if we've reached max integers
-    jge end_parse
-    mov [edi], ebx            ; Store parsed number in array
-    add edi, 4                ; Move to the next array element
-    inc ecx                   ; Increment parsed integer count
-    jmp parse_input
+    ; Store valid digit in the array
+    mov [array + r12], al
+    inc r12                 ; Increment the array index
 
-skip_space:
-    inc esi
-    jmp parse_input
+skip_char:
+    inc rdi                 ; Move to the next character in the input buffer
+    jmp parse_input         ; Continue parsing
 
-end_parse:
-    ; Reverse the array in place
-    lea esi, array            ; Start pointer
-    mov edx, ecx              ; Store count of parsed integers
-    dec edx                   ; Index of last valid integer
-    imul edx, edx, 4          ; Calculate offset in bytes
-    lea edi, [array + edx]    ; End pointer
+reverse_array:
+    ; Reverse the array
+    mov r12, 0              ; Left index
+    mov r13, 4              ; Right index
 
 reverse_loop:
-    cmp esi, edi              ; Check if pointers crossed
-    jge end_reverse           ; End loop if done
+    cmp r12, r13            ; Check if indices have crossed
+    jge print_array
 
-    ; Swap elements
-    mov eax, [esi]
-    mov ebx, [edi]
-    mov [esi], ebx
-    mov [edi], eax
+    ; Swap array[r12] and array[r13]
+    mov al, [array + r12]
+    mov bl, [array + r13]
+    mov [array + r12], bl
+    mov [array + r13], al
 
-    add esi, 4                ; Move start pointer forward
-    sub edi, 4                ; Move end pointer backward
+    ; Move indices
+    inc r12
+    dec r13
     jmp reverse_loop
 
-end_reverse:
-    ; Output the reversed array
-    mov eax, 4                ; syscall: sys_write
-    mov ebx, 1                ; stdout
-    mov ecx, output_msg       ; Message pointer
-    mov edx, 17               ; Message length
-    int 0x80
-
-    lea esi, array            ; Point to reversed array
-    mov ecx, edx              ; Number of parsed integers
-
-output_loop:
-    cmp ecx, 0                ; Check if we've printed all numbers
-    je output_done
-    mov eax, [esi]            ; Load integer from array
-    call print_integer        ; Print the integer
-    add esi, 4                ; Move to next array element
-    dec ecx                   ; Decrement counter
-
-    ; Print space after each number except the last
-    cmp ecx, 0
-    je output_done
-    mov eax, 4                ; syscall: sys_write
-    mov ebx, 1
-    mov ecx, space            ; Space character
-    mov edx, 1
-    int 0x80
-    jmp output_loop
-
-output_done:
-    ; Print a newline
-    mov eax, 4
-    mov ebx, 1
-    mov ecx, newline
-    mov edx, 1
-    int 0x80
-
-    ; Exit program
-    mov eax, 1                ; syscall: sys_exit
-    xor ebx, ebx              ; Return code 0
-    int 0x80
-
-; Helper function to print an integer
-print_integer:
-    xor ecx, ecx              ; Clear digit count
-    xor edx, edx              ; Clear remainder
+print_array:
+    mov r12, 0              ; Start printing from index 0
 
 print_loop:
-    mov ebx, 10
-    div ebx                   ; EAX = quotient, EDX = remainder
-    add dl, '0'               ; Convert remainder to ASCII
-    push dx                   ; Store digit on stack
-    inc ecx                   ; Increment digit count
-    test eax, eax             ; Check if quotient is zero
-    jnz print_loop
+    ; Load character from the array
+    mov al, [array + r12]
+    mov [input], al         ; Store character in input buffer
 
-output_digits:
-    pop dx                    ; Get digit from stack
-    mov al, dl
-    mov ah, 0
-    mov eax, 4                ; syscall: sys_write
-    mov ebx, 1
-    lea ecx, [esp]
-    mov edx, 1
-    int 0x80
-    loop output_digits
+    ; Print the character
+    mov rax, 1              ; sys_write
+    mov rdi, 1              ; stdout
+    mov rsi, input
+    mov rdx, 1
+    syscall
 
-    ret
+    ; Print newline
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, newline
+    mov rdx, 1
+    syscall
+
+    ; Increment index and check bounds
+    inc r12
+    cmp r12, 5
+    jl print_loop
+
+    ; Exit program
+    mov rax, 60             ; sys_exit
+    xor rdi, rdi            ; Exit code 0
+    syscall
+
+invalid_input:
+    ; Print invalid input message
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, invalid_input_msg
+    mov rdx, invalid_input_len
+    syscall
+
+    ; Restart input loop
+    jmp input_loop

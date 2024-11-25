@@ -1,3 +1,6 @@
+; Control Flow and Conditional Logic
+; Uses branching logic to classify the number as “POSITIVE,” “NEGATIVE,” or “ZERO.”
+
 section .data
     prompt db "Enter a number: ", 0
     positive_msg db "POSITIVE", 0

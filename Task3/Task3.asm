@@ -1,7 +1,5 @@
-; Program: Factorial Calculation (Fixed)
-; Description: Calculates factorial of a number (0-12)
-; Author: Corrected
-; Date: November 2024
+; Factorial Calculation 
+; Calculates factorial of a number (0-12)
 
 section .data
     prompt          db 'Enter a number (0-12): ', 0
